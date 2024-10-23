@@ -23,4 +23,6 @@ export {default as Pointer} from './interaction/Pointer.js';
 export {default as Select} from './interaction/Select.js';
 export {default as Snap} from './interaction/Snap.js';
 export {default as Translate} from './interaction/Translate.js';
+export {default as Rotate} from './interaction/Rotate.js';
+export {default as SplitLine} from './interaction/SplitLine.js';
 export {defaults} from './interaction/defaults.js';

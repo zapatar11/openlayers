@@ -107,6 +107,23 @@ import {getStrideForLayout} from '../geom/SimpleGeometry.js';
  * overlay.
  * @property {import("../geom/Geometry.js").GeometryLayout} [geometryLayout='XY'] Layout of the
  * feature geometries created by the draw interaction.
+ * LUISZ
+ * Variables nuevas
+ * @property {number} [sides=0] Luisz Zapata luiszapata The number of points that must be drawn
+ * before a polygon ring or line string can be finished. Default is `3` for
+ * polygon rings and `2` for line strings.
+ * @property {number} [distanciaVal = null] Luisz Zapata luiszapata The number of points that must be drawn
+ * before a polygon ring or line string can be finished. Default is `3` for
+ * polygon rings and `2` for line strings.
+ * @property {number} [anguloVal = null] Luisz Zapata luiszapata The number of points that must be drawn
+ * before a polygon ring or line string can be finished. Default is `3` for
+ * polygon rings and `2` for line strings.
+ * @property {import("../events/condition.js").Condition} [lastevent = null]
+ * Condition that activates freehand drawing for lines and polygons. This
+ * function takes a {@link module:ol/MapBrowserEvent~MapBrowserEvent} and
+ * returns a boolean to indicate whether that event should be handled. The
+ * default is {@link module:ol/events/condition.shiftKeyOnly}, meaning that the
+ * Shift key activates freehand drawing.
  */
 
 /**
@@ -595,6 +612,18 @@ class Draw extends PointerInteraction {
   /**
    * @param {Options} options Options.
    */
+
+  static Comando_ = {
+    PARALELO: 'PARALELO',
+    PERPENDICULAR: 'PERPENDICULAR',
+    TRACE: 'TRACE',
+    ENDWITHARC: 'ENDWITHARC',
+    AZIMUT: 'AZIMUT',
+    DISTANCIA: 'DISTANCIA',
+    RUMBO: 'RUMBO',
+    DEFLECCION: 'DEFLECCION',
+  };
+
   constructor(options) {
     const pointerOptions = /** @type {import("./Pointer.js").Options} */ (
       options
@@ -812,13 +841,23 @@ class Draw extends PointerInteraction {
         };
       }
     }
-
+    /**
+     * luisz luiszapata zarl
+     */
+    this.geometryFunctionOriginal_ = !options.geometryFunction
+      ? null
+      : options.geometryFunction;
     /**
      * @type {GeometryFunction}
      * @private
      */
-    this.geometryFunction_ = geometryFunction;
-
+    /**
+     * luisz luiszapata zarl
+     */
+    // this.geometryFunction_ = geometryFunction;
+    this.geometryFunction_ = !options.geometryFunction
+      ? this.generalFunctionDraw()
+      : options.geometryFunction;
     /**
      * @type {number}
      * @private
@@ -938,7 +977,52 @@ class Draw extends PointerInteraction {
      * @private
      */
     this.traceSource_ = options.traceSource || options.source || null;
+    /**
+     * LUISZ LARZ
+     * Variables nuevas
+     */
 
+    /**
+     * @private
+     * @type {import("../events/condition.js").Condition}
+     */
+    this.lastevent_ = null;
+
+    /**
+     * Drawing mode (derived from geometry type.
+     * @type {Mode}
+     * @private
+     */
+    this.drawMode_ = null;
+    /**
+     * Squared tolerance for handling up events.  If the squared distance
+     * between a down and up event is greater than this tolerance, up events
+     * will not be handled.
+     * @type {number}
+     * @private
+     */
+    this.distanciaVal = null;
+    /**
+     * Squared tolerance for handling up events.  If the squared distance
+     * between a down and up event is greater than this tolerance, up events
+     * will not be handled.
+     * @type {number}
+     * @private
+     */
+    this.anguloVal = null;
+    /**
+     * Squared tolerance for handling up events.  If the squared distance
+     * between a down and up event is greater than this tolerance, up events
+     * will not be handled.
+     * @type {number}
+     * @private
+     */
+    this.sides = 0;
+
+    /**
+     * LUISZ LARZ END
+     * Variables nuevas
+     */
     this.addChangeListener(InteractionProperty.ACTIVE, this.updateState_);
   }
 
@@ -1852,6 +1936,596 @@ class Draw extends PointerInteraction {
       this.abortDrawing();
     }
     this.overlay_.setMap(active ? map : null);
+  }
+
+  /**
+   * Metodos LUISZ ZARL LUISZAPATA
+   */
+
+  handleUpCoord(coord, mapaedicion) {
+    let pass = true;
+
+    this.handlePointerInput(coord, mapaedicion);
+
+    const circleMode = this.mode_ === 'Circle';
+
+    if (!this.finishCoordinate_) {
+      this.empezarTrazo_(coord);
+      if (this.mode_ === 'Point') {
+        this.finishDrawing();
+      }
+    } else if (circleMode) {
+      this.finishDrawing();
+    } else if (this.atFinish(coord, mapaedicion)) {
+      this.finishDrawing();
+    } else {
+      this.addToDrawing(coord);
+    }
+    pass = false;
+
+    return pass;
+  }
+
+  setMode(type) {
+    this.sketchLine_ = null;
+    this.sketchLineCoords_ = null;
+    //this.sketchCoords_ = null;
+    if (this.type_ == 'Polygon' && type != 'Polygon') {
+      //si es poligono y se va a cambiar a otro que no sea poligono
+      this.sketchCoords_ = this.sketchCoords_[0];
+      if (type == 'Circle') {
+        this.sketchLineCoords_ = this.sketchCoords_;
+      }
+    } else if (this.type_ != 'Polygon' && type == 'Polygon') {
+      //Si no es poligono  y se va a convertir en poligono
+      this.sketchCoords_ = [this.sketchCoords_];
+      this.sketchLineCoords_ = this.sketchCoords_[0];
+    }
+
+    if (this.sketchLineCoords_) {
+      this.sketchLine_ = new Feature(new LineString(this.sketchLineCoords_));
+    }
+
+    this.type_ = type;
+    this.mode_ = getMode(this.type_);
+    this.minPoints_ = this.mode_ === 'Polygon' ? 3 : this.minPoints_;
+  }
+  setSides(feature) {}
+  setDrawMode(type) {
+    this.drawMode_ = Draw.Comando_[type] || null;
+  }
+  setDrawLenght(length) {
+    this.distanciaVal = length;
+    this.geometryFunction_ = this.generalFunctionDraw();
+  }
+  setDrawDirection(angle) {
+    this.anguloVal = angle;
+    this.geometryFunction_ = this.generalFunctionDraw();
+  }
+  resetDrawParams() {
+    this.drawMode_ = null;
+    this.anguloVal = null;
+    this.distanciaVal = null;
+    this.geometryFunction_ = this.geometryFunctionOriginal_
+      ? this.geometryFunctionOriginal_
+      : this.generalFunctionDraw();
+  }
+  setGeometryFunction(type, sides) {
+    const lados = typeof sides !== 'undefined' ? sides : 0;
+
+    if (type == 'Circle') {
+      this.geometryFunction_ = function (coordinates, geometry) {
+        let nueva_geometria = geometry;
+        const centro = coordinates[0];
+        const punto2 = coordinates[1];
+        const radio = Math.sqrt(
+          Draw.squaredDistance(coordinates[0], coordinates[1]),
+        );
+        const angle = Math.atan(
+          (centro[1] - punto2[1]) / (centro[0] - punto2[0]),
+        );
+        nueva_geometria = fromCircle(new Circle(centro), lados);
+        makeRegular(nueva_geometria, centro, radio, angle);
+
+        return nueva_geometria;
+      };
+    } else {
+      let Constructor;
+      const mode = type;
+      if (mode === 'Point') {
+        Constructor = Point;
+      } else if (mode === 'LineString') {
+        Constructor = LineString;
+      } else if (mode === 'Polygon') {
+        Constructor = Polygon;
+      }
+
+      this.geometryFunction_ = function (coordinates, geometry) {
+        let nueva_geometria = geometry;
+        nueva_geometria = new Constructor(coordinates);
+        return nueva_geometria;
+      };
+    }
+    let geometry = this.sketchFeature_.getGeometry();
+    geometry = this.geometryFunction_(this.sketchCoords_, geometry);
+    this.sketchFeature_.setGeometry(geometry);
+    this.updateSketchFeatures_();
+    //this.sketchFeature_.setGeometry(null);
+    //let geometry = /** @type {ol.geom.SimpleGeometry} */ (this.sketchFeature_.getGeometry());
+    //geometry = this.geometryFunction_(this.sketchCoords_, geometry);
+    //this.sketchFeature_.setGeometry(geometry);
+  }
+  getLastEvent() {
+    return this.lastevent_;
+  }
+  generalFunctionDraw() {
+    const drawMode = this.drawMode_;
+    const type = this.type_;
+    let distancia = this.distanciaVal;
+    const angulo = this.anguloVal;
+    // const eventCoord = this.getLastEvent();
+
+    let Constructor;
+    const mode = this.mode_;
+    if (mode === 'Point') {
+      Constructor = Point;
+    } else if (mode === 'LineString') {
+      Constructor = LineString;
+    } else if (mode === 'Polygon') {
+      Constructor = Polygon;
+    }
+
+    return function (coordinates, opt_geometry) {
+      let geometry = opt_geometry;
+      // let nextCoordinate;
+      let coordenadas;
+      if (distancia || angulo) {
+        if (mode == 'LineString') {
+          coordenadas = coordinates;
+        } else {
+          coordenadas = coordinates[0];
+        }
+        const lastPoint =
+          coordenadas.length > 1
+            ? coordenadas.length - 2
+            : coordenadas.length - 1;
+        const origen = coordenadas[lastPoint];
+        let angle =
+          angulo || Draw.getAzimut(origen, coordenadas[coordenadas.length - 1]);
+        let length;
+
+        if (
+          drawMode == Draw.Comando_.PARALELO ||
+          drawMode == Draw.Comando_.PERPENDICULAR
+        ) {
+          if (drawMode == Draw.Comando_.PERPENDICULAR) {
+            angle = angle + 90;
+            if (angle >= 360) {
+              angle = angle - 360;
+            }
+          }
+
+          let minangle = angle - 90;
+          let maxangle = angle + 90;
+          let angle_ = Draw.getAzimut(
+            origen,
+            coordenadas[coordenadas.length - 1],
+          );
+          if (maxangle < minangle) {
+            if (minangle < 0) {
+              minangle = 360 + minangle;
+            } else if (maxangle >= 360) {
+              maxangle = maxangle - 360;
+            }
+
+            if (minangle > maxangle) {
+              maxangle = maxangle + 360;
+              angle_ = angle_ + 360;
+            }
+          }
+          //let distancia =  Math.sqrt(ol.interaction.Draw.squaredDistance(origen, coordenada));
+          distancia = Math.sqrt(
+            Draw.squaredDistance(origen, coordenadas[coordenadas.length - 1]),
+          );
+          if (angle_ < maxangle && angle_ > minangle) {
+            distancia = distancia;
+          } else {
+            distancia = distancia * -1;
+          }
+          length =
+            distancia ||
+            Math.sqrt(
+              Draw.squaredDistance(origen, coordenadas[coordenadas.length - 1]),
+            );
+        } else {
+          length =
+            distancia ||
+            Math.sqrt(
+              Draw.squaredDistance(origen, coordenadas[coordenadas.length - 1]),
+            );
+        }
+
+        const nextCoordinate = Draw.getPointFromDirection(
+          origen,
+          angle,
+          length,
+        );
+        //coordinates[lastPoint] = nextCoordinate;
+        coordenadas[coordenadas.length - 1] = nextCoordinate;
+        if (mode == 'LineString') {
+          coordinates = coordenadas;
+        } else {
+          coordinates = [coordenadas];
+        }
+      }
+      let response_geometry;
+      if (type == 'Circle') {
+        const circle = opt_geometry ? opt_geometry : new Circle([NaN, NaN]);
+        const squaredLength = squaredCoordinateDistance(
+          coordinates[0],
+          coordinates[1],
+        );
+        circle.setCenterAndRadius(coordinates[0], Math.sqrt(squaredLength));
+        response_geometry = circle;
+        // return circle;
+      } else {
+        if (geometry) {
+          if (mode === 'Polygon') {
+            if (coordinates[0].length) {
+              // Add a closing coordinate to match the first
+              geometry.setCoordinates([
+                coordinates[0].concat([coordinates[0][0]]),
+              ]);
+            } else {
+              geometry.setCoordinates([]);
+            }
+          } else {
+            geometry.setCoordinates(coordinates);
+          }
+        } else {
+          geometry = new Constructor(coordinates);
+        }
+        response_geometry = geometry;
+        // return geometry;
+      }
+      return response_geometry;
+    };
+  }
+  getSketchCoordinate() {
+    //this.updateSketchFeatures_();
+    //this.sketchFeature_.getGeometry();
+    let sketchs;
+    if (this.mode_ === 'LineString') {
+      sketchs = this.sketchCoords_;
+    } else if (this.mode_ === 'Polygon') {
+      sketchs = this.sketchCoords_[0];
+    } else {
+      sketchs = this.sketchCoords_;
+    }
+
+    return sketchs;
+  }
+  cerrarLineString() {
+    const sketchFeature = this.abortDrawing_();
+    let coordinates = this.sketchCoords_;
+    let geometry;
+    if (this.mode_ === 'LineString') {
+      // remove the redundant last point
+      coordinates = [coordinates];
+      coordinates[0].pop();
+      coordinates[0].push(coordinates[0][0]);
+      sketchFeature.setGeometry(new Polygon(coordinates));
+      geometry = sketchFeature.getGeometry();
+      this.geometryFunction_(coordinates, geometry);
+    }
+    // cast multi-part geometries
+    if (this.type_ === 'MultiPoint') {
+      sketchFeature.setGeometry(new MultiPoint([coordinates]));
+    } else if (this.type_ === 'MultiLineString') {
+      sketchFeature.setGeometry(new MultiLineString([coordinates]));
+    } else if (this.type_ === 'MultiPolygon') {
+      sketchFeature.setGeometry(new MultiPolygon([coordinates]));
+    }
+    // First dispatch event to allow full set up of feature
+    this.dispatchEvent(new DrawEvent(DrawEventType.DRAWEND, sketchFeature));
+    // Then insert feature
+    if (this.features_) {
+      this.features_.push(sketchFeature);
+    }
+    if (this.source_) {
+      this.source_.addFeature(sketchFeature);
+    }
+  }
+  addToDrawing(coord) {
+    //let coordinate = event.coordinate;
+    const coordinate = coord;
+    const geometry = this.sketchFeature_.getGeometry();
+    let done;
+    let coordinates;
+    if (this.mode_ === 'LineString') {
+      this.finishCoordinate_ = coordinate.slice();
+      coordinates = this.sketchCoords_;
+      if (coordinates.length >= this.maxPoints_) {
+        if (this.freehand_) {
+          coordinates.pop();
+        } else {
+          done = true;
+        }
+      }
+      coordinates.push(coordinate.slice());
+      this.geometryFunction_(coordinates, geometry);
+    } else if (this.mode_ === 'Polygon') {
+      coordinates = this.sketchCoords_[0];
+      if (coordinates.length >= this.maxPoints_) {
+        if (this.freehand_) {
+          coordinates.pop();
+        } else {
+          done = true;
+        }
+      }
+      coordinates.push(coordinate.slice());
+      if (done) {
+        this.finishCoordinate_ = coordinates[0];
+      }
+      this.geometryFunction_(this.sketchCoords_, geometry);
+    }
+    this.updateSketchFeatures_();
+    if (done) {
+      this.finishDrawing();
+    }
+  }
+  handlePointerInput(coord, mapaedicion) {
+    /*if (this.downPx_ &&
+        ((!this.freehand_ && this.shouldHandle_) ||
+        (this.freehand_ && !this.shouldHandle_))) {
+        let downPx = this.downPx_;
+        let clickPx = coord;
+        let dx = downPx[0] - clickPx[0];
+        let dy = downPx[1] - clickPx[1];
+        let squaredDistance = dx * dx + dy * dy;
+        this.shouldHandle_ = this.freehand_ ?
+        squaredDistance > this.squaredClickTolerance_ :
+        squaredDistance <= this.squaredClickTolerance_;
+    }*/
+
+    if (this.finishCoordinate_) {
+      this.modifyDrawing(coord, mapaedicion);
+    } else {
+      this.createOrUpdateSketchPoint(coord);
+    }
+    return true;
+  }
+  createOrUpdateSketchPoint(coord) {
+    const coordinates = coord.slice();
+    if (!this.sketchPoint_) {
+      this.sketchPoint_ = new Feature(new Point(coordinates));
+      this.updateSketchFeatures_();
+    } else {
+      const sketchPointGeom = this.sketchPoint_.getGeometry();
+      sketchPointGeom.setCoordinates(coordinates);
+    }
+  }
+  modifyDrawing(coord, mapaedicion) {
+    //let coordinate = event.coordinate;
+    let coordinate = coord;
+    let geometry = this.sketchFeature_.getGeometry();
+    let coordinates, last;
+    if (this.mode_ === 'Point') {
+      last = this.sketchCoords_;
+    } else if (this.mode_ === 'Polygon') {
+      coordinates = this.sketchCoords_[0];
+      last = coordinates[coordinates.length - 1];
+      if (this.atFinish(coord, mapaedicion)) {
+        // snap to finish
+        coordinate = this.finishCoordinate_.slice();
+      }
+    } else {
+      coordinates = this.sketchCoords_;
+      last = coordinates[coordinates.length - 1];
+    }
+    last[0] = coordinate[0];
+    last[1] = coordinate[1];
+
+    const newgeometry = this.geometryFunction_(this.sketchCoords_, geometry);
+    // const miscoordenadas = newgeometry.getCoordinates();
+
+    this.sketchFeature_.setGeometry(newgeometry);
+    geometry = this.sketchFeature_.getGeometry();
+    if (this.sketchPoint_) {
+      const sketchPointGeom = this.sketchPoint_.getGeometry();
+      sketchPointGeom.setCoordinates(coordinate);
+    }
+    let sketchLineGeom;
+    if (geometry instanceof Polygon && this.mode_ !== 'Polygon') {
+      if (!this.sketchLine_) {
+        this.sketchLine_ = new Feature(new LineString(null));
+      }
+      const ring = geometry.getLinearRing(0);
+      sketchLineGeom = this.sketchLine_.getGeometry();
+      sketchLineGeom.setFlatCoordinates(
+        ring.getLayout(),
+        ring.getFlatCoordinates(),
+      );
+    } else if (this.sketchLineCoords_) {
+      sketchLineGeom = this.sketchLine_.getGeometry();
+      sketchLineGeom.setCoordinates(this.sketchLineCoords_);
+    }
+    this.updateSketchFeatures_();
+  }
+  atFinish(coord, mapaedicion) {
+    let at = false;
+    if (this.sketchFeature_) {
+      let potentiallyDone = false;
+      let potentiallyFinishCoordinates = [this.finishCoordinate_];
+      if (this.mode_ === 'LineString') {
+        potentiallyDone = this.sketchCoords_.length > this.minPoints_;
+      } else if (this.mode_ === 'Polygon') {
+        potentiallyDone = this.sketchCoords_[0].length > this.minPoints_;
+        potentiallyFinishCoordinates = [
+          this.sketchCoords_[0][0],
+          this.sketchCoords_[0][this.sketchCoords_[0].length - 2],
+        ];
+      }
+      if (potentiallyDone) {
+        const map = mapaedicion;
+        for (let i = 0, ii = potentiallyFinishCoordinates.length; i < ii; i++) {
+          const finishCoordinate = potentiallyFinishCoordinates[i];
+          const finishPixel = map.getPixelFromCoordinate(finishCoordinate);
+          //const pixel = event.pixel;
+          const pixel = map.getPixelFromCoordinate(coord);
+          const dx = pixel[0] - finishPixel[0];
+          const dy = pixel[1] - finishPixel[1];
+          const snapTolerance = this.freehand_ ? 1 : this.snapTolerance_;
+          at = Math.sqrt(dx * dx + dy * dy) <= snapTolerance;
+          if (at) {
+            this.finishCoordinate_ = finishCoordinate;
+            break;
+          }
+        }
+      }
+    }
+    return at;
+  }
+  static squaredDistanceToSegment(coordinate, segment) {
+    return Draw.squaredDistance(
+      coordinate,
+      Draw.closestOnSegment(coordinate, segment),
+    );
+  }
+  static squaredDistance(coord1, coord2) {
+    const dx = coord1[0] - coord2[0];
+    const dy = coord1[1] - coord2[1];
+    return dx * dx + dy * dy;
+  }
+  static getAzimut(coordinate1, coordinate2) {
+    const x1 = coordinate1[0];
+    const y1 = coordinate1[1];
+
+    const x2 = coordinate2[0];
+    const y2 = coordinate2[1];
+
+    let azimut = 0;
+
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+
+    const Az2 = Math.atan(dx / dy);
+
+    if (dx > 0 && dy > 0) {
+      //Primer Cuadrante
+      azimut = Az2;
+    } else if (dx > 0 && dy < 0) {
+      //Cuarto Cuadrante
+      azimut = Az2 + Math.PI;
+    } else if (dx < 0 && dy < 0) {
+      //Tercer Cuadrante
+      azimut = Az2 + Math.PI;
+    } else if (dx < 0 && dy > 0) {
+      //Segundo Cuadrante
+      azimut = Az2 + 2 * Math.PI;
+    }
+
+    const azimutAng = (azimut * 180) / Math.PI;
+
+    return azimutAng;
+  }
+  static getPointFromDirection(coordinateOrigen, angulo, distancia) {
+    const x = coordinateOrigen[0];
+    const y = coordinateOrigen[1];
+    let teta = angulo;
+    const h = distancia;
+
+    if (angulo < 0) {
+      //En caso de que introduzcan angulos negativos
+      //Como es negativo se restará
+      teta = 360 + angulo;
+    }
+    //El angulo es una vuelta completa retornando al punto de inicio
+    if (angulo == 360) {
+      teta = 0;
+    }
+
+    //Ajustamos el angulo para realizar las operaciones
+    if (teta >= 0 && teta <= 90) {
+      teta = 90 - teta;
+    } else if (teta > 90 && teta <= 180) {
+      teta = 360 - teta + 90;
+    } else if (teta > 180 && teta <= 270) {
+      teta = 270 - teta + 180;
+    } else if (teta > 270 && teta < 360) {
+      teta = 180 - teta + 270;
+    }
+    //Convertimos angulos a radianes
+    teta = (teta * Math.PI) / 180;
+    const x2 = Math.cos(teta) * h + x;
+    let y2 = Math.tan(teta) * (x2 - x) + y;
+
+    //En caso de que el eje y haya quedado en el origen
+    if (Math.tan(teta) * (x2 - x) == 0) {
+      if (angulo == 360 || angulo == 0) {
+        y2 = y + distancia;
+      } else if (angulo == 180) {
+        y2 = y - distancia;
+      }
+    }
+    const coordinateResult = [x2, y2];
+    return coordinateResult;
+  }
+  static closestOnSegment(coordinate, segment) {
+    const x0 = coordinate[0];
+    const y0 = coordinate[1];
+    const start = segment[0];
+    const end = segment[1];
+    const x1 = start[0];
+    const y1 = start[1];
+    const x2 = end[0];
+    const y2 = end[1];
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const along =
+      dx === 0 && dy === 0
+        ? 0
+        : dx * (x0 - x1) + (dy * (y0 - y1)) / (dx * dx + dy * dy) || 0;
+    let x, y;
+    if (along <= 0) {
+      x = x1;
+      y = y1;
+    } else if (along >= 1) {
+      x = x2;
+      y = y2;
+    } else {
+      x = x1 + along * dx;
+      y = y1 + along * dy;
+    }
+    return [x, y];
+  }
+  empezarTrazo_(coord) {
+    const start = coord;
+    this.finishCoordinate_ = start;
+    if (this.mode_ === 'Point') {
+      this.sketchCoords_ = start.slice();
+    } else if (this.mode_ === 'Polygon') {
+      this.sketchCoords_ = [[start.slice(), start.slice()]];
+      this.sketchLineCoords_ = this.sketchCoords_[0];
+    } else {
+      this.sketchCoords_ = [start.slice(), start.slice()];
+      if (this.mode_ === 'Circle') {
+        this.sketchLineCoords_ = this.sketchCoords_;
+      }
+    }
+    if (this.sketchLineCoords_) {
+      this.sketchLine_ = new Feature(new LineString(this.sketchLineCoords_));
+    }
+    const geometry = this.geometryFunction_(this.sketchCoords_);
+    this.sketchFeature_ = new Feature();
+    if (this.geometryName_) {
+      this.sketchFeature_.setGeometryName(this.geometryName_);
+    }
+    this.sketchFeature_.setGeometry(geometry);
+    this.updateSketchFeatures_();
+    this.dispatchEvent(
+      new DrawEvent(DrawEventType.DRAWSTART, this.sketchFeature_),
+    );
   }
 }
 
