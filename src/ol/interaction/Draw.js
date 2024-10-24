@@ -2033,7 +2033,6 @@ class Draw extends PointerInteraction {
   resetDrawParams() {
     this.drawMode_ = null;
     this.anguloVal = null;
-    console.log("sometghin");
     this.distanciaVal = null;
     this.geometryFunction_ = this.geometryFunctionOriginal_
       ? this.geometryFunctionOriginal_
