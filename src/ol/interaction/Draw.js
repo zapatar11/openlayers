@@ -1457,6 +1457,7 @@ class Draw extends PointerInteraction {
         return;
       }
     }
+    this.lastevent_ = event;
 
     if (!this.finishCoordinate_) {
       this.createOrUpdateSketchPoint_(event.coordinate.slice());
@@ -1688,6 +1689,7 @@ class Draw extends PointerInteraction {
     }
     this.createOrUpdateSketchPoint_(coordinate.slice());
     this.updateSketchFeatures_();
+    this.resetDrawParams();
     if (done) {
       return this.finishDrawing();
     }
@@ -1751,7 +1753,33 @@ class Draw extends PointerInteraction {
   removeLastPoint() {
     this.removeLastPoints_(1);
   }
+  getLastEventCoordinate() {
+    if (!this.lastevent_) {
+      return;
+    }
+    const evento = this.lastevent_;
+    const featureAtPixel_ = this.featuresAtPixel_(
+      this.lastevent_.pixel,
+      this.lastevent_.map,
+    );
 
+    const geometry = featureAtPixel_.getGeometry();
+    let linestring = geometry;
+
+    //console.log(geometry,linestring,featureAtPixel_);
+    if (geometry instanceof Polygon) {
+      const linearRing = geometry.getLinearRing(0);
+      const coordinates = linearRing.getCoordinates();
+      linestring = new LineString(coordinates);
+    }
+
+    const segmentos = [];
+    linestring.forEachSegment(function (a, b, c) {
+      const seg = new LineString([a, b]);
+      segmentos.push(seg);
+    });
+    return [evento.coordinate.slice(), segmentos];
+  }
   /**
    * Stop drawing and add the sketch feature to the target layer.
    * The {@link module:ol/interaction/Draw~DrawEventType.DRAWEND} event is
@@ -2527,6 +2555,22 @@ class Draw extends PointerInteraction {
       new DrawEvent(DrawEventType.DRAWSTART, this.sketchFeature_),
     );
   }
+
+  featuresAtPixel_ = function (pixel, map) {
+    return map.forEachFeatureAtPixel(
+      pixel,
+      function (feature, layer) {
+        //console.log(feature,layer);
+        if (layer) {
+          return feature;
+        }
+      }.bind(this),
+      {
+        layerFilter: this.layerFilter_,
+        hitTolerance: this.hitTolerance_,
+      },
+    );
+  };
 }
 
 /**
