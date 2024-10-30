@@ -18,19 +18,19 @@ import {Point} from '../geom.js';
  */
 const RotateEventType = {
   /**
-   * Triggered upon feature translation start.
+   * Triggered upon feature rotation start.
    * @event RotateEvent#rotatestart
    * @api
    */
   ROTATESTART: 'rotatestart',
   /**
-   * Triggered upon feature translation.
+   * Triggered upon feature rotation.
    * @event RotateEvent#rotating
    * @api
    */
   ROTATING: 'rotating',
   /**
-   * Triggered upon feature translation end.
+   * Triggered upon feature rotation end.
    * @event RotateEvent#rotateend
    * @api
    */
@@ -41,7 +41,7 @@ const RotateEventType = {
  * A function that takes a {@link module:ol/Feature~Feature} or
  * {@link module:ol/render/Feature~RenderFeature} and a
  * {@link module:ol/layer/Layer~Layer} and returns `true` if the feature may be
- * translated or `false` otherwise.
+ * rotated or `false` otherwise.
  * @typedef {function(Feature, import("../layer/Layer.js").default<import("../source/Source.js").default>):boolean} FilterFunction
  */
 
@@ -51,17 +51,17 @@ const RotateEventType = {
  * takes a {@link module:ol/MapBrowserEvent~MapBrowserEvent} and returns a
  * boolean to indicate whether that event should be handled.
  * Default is {@link module:ol/events/condition.always}.
- * @property {Collection<Feature>} [features] Features contained in this collection will be able to be translated together.
+ * @property {Collection<Feature>} [features] Features contained in this collection will be able to be rotated together.
  * @property {Array<import("../layer/Layer.js").default>|function(import("../layer/Layer.js").default<import("../source/Source.js").default>): boolean} [layers] A list of layers from which features should be
- * translated. Alternatively, a filter function can be provided. The
+ * rotated. Alternatively, a filter function can be provided. The
  * function will be called for each layer in the map and should return
- * `true` for layers that you want to be translatable. If the option is
- * absent, all visible layers will be considered translatable.
+ * `true` for layers that you want to be rotable. If the option is
+ * absent, all visible layers will be considered rotable.
  * Not used if `features` is provided.
  * @property {FilterFunction} [filter] A function
  * that takes a {@link module:ol/Feature~Feature} and an
  * {@link module:ol/layer/Layer~Layer} and returns `true` if the feature may be
- * translated or `false` otherwise. Not used if `features` is provided.
+ * rotated or `false` otherwise. Not used if `features` is provided.
  * @property {number} [hitTolerance=0] Hit-detection tolerance. Pixels inside the radius around the given position
  * will be checked for features.
  */
@@ -74,16 +74,16 @@ const RotateEventType = {
 export class RotateEvent extends Event {
   /**
    * @param {RotateEventType} type Type.
-   * @param {Collection<Feature>} features The features translated.
+   * @param {Collection<Feature>} features The features rotated.
    * @param {import("../coordinate.js").Coordinate} coordinate The event coordinate.
-   * @param {import("../coordinate.js").Coordinate} startCoordinate The original coordinates before.translation started
+   * @param {import("../coordinate.js").Coordinate} startCoordinate The original coordinates before.rotation started
    * @param {import("../MapBrowserEvent.js").default} mapBrowserEvent Map browser event.
    */
   constructor(type, features, coordinate, startCoordinate, mapBrowserEvent) {
     super(type);
 
     /**
-     * The features being translated.
+     * The features being rotated.
      * @type {Collection<Feature>}
      * @api
      */
@@ -98,7 +98,7 @@ export class RotateEvent extends Event {
     this.coordinate = coordinate;
 
     /**
-     * The coordinate of the start position before translation started.
+     * The coordinate of the start position before rotation started.
      * @const
      * @type {import("../coordinate.js").Coordinate}
      * @api
@@ -119,15 +119,15 @@ export class RotateEvent extends Event {
  * @typedef {import("../Observable.js").OnSignature<import("../Observable.js").EventTypes, import("../events/Event.js").default, Return> &
  *   import("../Observable.js").OnSignature<import("../ObjectEventType.js").Types|
  *     'change:active', import("../Object.js").ObjectEvent, Return> &
- *   import("../Observable.js").OnSignature<'translateend'|'translatestart'|'translating', RotateEvent, Return> &
+ *   import("../Observable.js").OnSignature<'rotateend'|'rotatestart'|'rotating', RotateEvent, Return> &
  *   import("../Observable.js").CombinedOnSignature<import("../Observable.js").EventTypes|import("../ObjectEventType.js").Types|
- *     'change:active'|'translateend'|'translatestart'|'translating', Return>} TranslateOnSignature
+ *     'change:active'|'rotateend'|'rotatestart'|'rotating', Return>} RotateOnSignature
  */
 
 /**
  * @classdesc
- * Interaction for translating (moving) features.
- * If you want to translate multiple features in a single action (for example,
+ * Interaction for rotating (moving) features.
+ * If you want to rotate multiple features in a single action (for example,
  * the collection used by a select interaction), construct the interaction with
  * the `features` option.
  *
@@ -144,29 +144,29 @@ class Rotate extends PointerInteraction {
     super(/** @type {import("./Pointer.js").Options} */ (options));
 
     /***
-     * @type {TranslateOnSignature<import("../events.js").EventsKey>}
+     * @type {RotateOnSignature<import("../events.js").EventsKey>}
      */
     this.on;
 
     /***
-     * @type {TranslateOnSignature<import("../events.js").EventsKey>}
+     * @type {RotateOnSignature<import("../events.js").EventsKey>}
      */
     this.once;
 
     /***
-     * @type {TranslateOnSignature<void>}
+     * @type {RotateOnSignature<void>}
      */
     this.un;
 
     /**
-     * The last position we translated to.
+     * The last position we rotated to.
      * @type {import("../coordinate.js").Coordinate}
      * @private
      */
     this.lastCoordinate_ = null;
 
     /**
-     * The start position before translation started.
+     * The start position before rotation started.
      * @type {import("../coordinate.js").Coordinate}
      * @private
      */
@@ -239,22 +239,28 @@ class Rotate extends PointerInteraction {
      * @private
      */
     this.source_cartodi_pivote_ = options.pivote ? options.pivote : null;
-    options.pivote.addFeature(this.pivote_1);
+    // options.pivote.addFeature(this.pivote_1);
 
+    // this.source_cartodi_pivote2_ = options.pivote2 ? options.pivote2 : null;
+    // console.log(options);
+    // options.pivote2.addFeature(this.pivote_2);
     /**
-     * @type {VectorSource}
+     * The last position we rotated to.
+     * @type {import("../coordinate.js").Coordinate}
      * @private
      */
-    this.source_cartodi_pivote2_ = options.pivote2 ? options.pivote2 : null;
-    options.pivote2.addFeature(this.pivote_2);
-
     this.coordinate_ = null;
-
+    /**
+     * @type {Object}
+     * @private
+     */
     this.cartodi = options.cartodi;
 
+    /**
+     * @type {boolean}
+     * @private
+     */
     this.first_ = true;
-
-    this.source_pivote = null;
 
     this.addChangeListener(
       InteractionProperty.ACTIVE,
@@ -342,21 +348,21 @@ class Rotate extends PointerInteraction {
   handleDragEvent(event) {
     if (this.lastCoordinate_) {
       const newCoordinate = event.coordinate;
-      // const projection = event.map.getView().getProjection();
+      //   const projection = event.map.getView().getProjection();
 
-      // const newViewCoordinate = fromUserCoordinate(newCoordinate, projection);
-      // const lastViewCoordinate = fromUserCoordinate(
-      //   this.lastCoordinate_,
-      //   projection,
-      // );
-      // const deltaX = newViewCoordinate[0] - lastViewCoordinate[0];
-      // const deltaY = newViewCoordinate[1] - lastViewCoordinate[1];
+      //   const newViewCoordinate = fromUserCoordinate(newCoordinate, projection);
+      //   const lastViewCoordinate = fromUserCoordinate(
+      //     this.lastCoordinate_,
+      //     projection,
+      //   );
+      //   const deltaX = newViewCoordinate[0] - lastViewCoordinate[0];
+      //   const deltaY = newViewCoordinate[1] - lastViewCoordinate[1];
 
       const centroide = this.pivote_1.getGeometry().getCoordinates();
       // const pivote2 = this.pivote_2.getGeometry().getCoordinates();
 
       const angulo_inicial = this.getAzimut(centroide, this.coordinate_);
-      const angulo = this.getAzimut(centroide, event.coordinate);
+      const angulo = this.getAzimut(centroide, newCoordinate);
 
       const angulo_final = (angulo_inicial - angulo) * -1;
       const angulo_en_radiane = (angulo_final * Math.PI) / -180;
@@ -369,7 +375,7 @@ class Rotate extends PointerInteraction {
       // }
 
       const features = this.features_ || new Collection([this.lastFeature_]);
-      // const userProjection = getUserProjection();
+      //   const userProjection = getUserProjection();
 
       const featuresEdit = features.getArray();
       const llaves = Object.keys(this.cartodi.feature_original);
@@ -389,6 +395,13 @@ class Rotate extends PointerInteraction {
         }
         const geometria = featuresEdit[x].getGeometry();
         this.cartodi.predioEdicionSelected[id] = featuresEdit[x];
+
+        // if (userProjection) {
+        //   geometria.transform(userProjection, projection);
+        //   geometria.rotate(angulo_en_radiane, centroide);
+        //   geometria.transform(projection, userProjection);
+        // } else {
+        // }
         geometria.rotate(angulo_en_radiane, centroide);
         featuresEdit[x].setGeometry(geometria);
       }
@@ -528,29 +541,23 @@ class Rotate extends PointerInteraction {
   refreshFeaturesPivotes() {
     const features = this.features_ || new Collection([this.lastFeature_]);
 
-    const source = new VectorSource();
+    const newsource = new VectorSource();
 
-    source.addFeatures(features.getArray());
+    newsource.addFeatures(features.getArray());
 
-    const extent = source.getExtent();
+    const extent = newsource.getExtent();
     const centro = this.getCenterOfExtent(extent);
 
     const punto1 = new Point(centro);
 
-    const nextCoordinate = this.getPointFromDirection(centro, 45, 5);
-    const punto2 = new Point(nextCoordinate);
-
     this.pivote_1.setGeometry(punto1);
     this.pivote_1.setId('PIVOTE_1_ID');
-    this.pivote_2.setGeometry(punto2);
-    this.pivote_2.setId('PIVOTE_2_ID');
+
     const pivote1 = this.source_cartodi_pivote_;
     pivote1.addFeature(this.pivote_1);
-    const pivote2 = this.source_cartodi_pivote2_;
-    pivote2.addFeature(this.pivote_2);
 
     if (this.first_) {
-      this.features_.push(this.pivote_2);
+      //   this.features_.push(this.pivote_2);
       this.first_ = false;
     }
   }

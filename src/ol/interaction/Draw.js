@@ -2510,10 +2510,14 @@ class Draw extends PointerInteraction {
     const y2 = end[1];
     const dx = x2 - x1;
     const dy = y2 - y1;
-    const along =
-      dx === 0 && dy === 0
-        ? 0
-        : dx * (x0 - x1) + (dy * (y0 - y1)) / (dx * dx + dy * dy) || 0;
+
+    const restx = dx * (x0 - x1);
+    const resty = dy * (y0 - y1);
+    const addrest = restx + resty;
+    const multiply = dx * dx + dy * dy;
+    const resultado = addrest / multiply;
+
+    const along = dx === 0 && dy === 0 ? 0 : resultado || 0;
     let x, y;
     if (along <= 0) {
       x = x1;
