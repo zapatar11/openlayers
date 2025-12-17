@@ -1,16 +1,18 @@
 /**
  * @module ol/render/canvas/Executor
  */
-import CanvasInstruction from './Instruction.js';
-import ZIndexContext from '../canvas/ZIndexContext.js';
-import {TEXT_ALIGN} from './TextBuilder.js';
+import {equals} from '../../array.js';
+import {createEmpty, createOrUpdate, intersects} from '../../extent.js';
+import {lineStringLength} from '../../geom/flat/length.js';
+import {drawTextOnPath} from '../../geom/flat/textpath.js';
+import {transform2D} from '../../geom/flat/transform.js';
 import {
   apply as applyTransform,
   compose as composeTransform,
   create as createTransform,
   setFromArray as transformSetFromArray,
 } from '../../transform.js';
-import {createEmpty, createOrUpdate, intersects} from '../../extent.js';
+import ZIndexContext from '../canvas/ZIndexContext.js';
 import {
   defaultPadding,
   defaultTextAlign,
@@ -19,10 +21,8 @@ import {
   getTextDimensions,
   measureAndCacheTextWidth,
 } from '../canvas.js';
-import {drawTextOnPath} from '../../geom/flat/textpath.js';
-import {equals} from '../../array.js';
-import {lineStringLength} from '../../geom/flat/length.js';
-import {transform2D} from '../../geom/flat/transform.js';
+import CanvasInstruction from './Instruction.js';
+import {TEXT_ALIGN} from './TextBuilder.js';
 
 /**
  * @typedef {import('../../structs/RBush.js').Entry<import('../../Feature.js').FeatureLike>} DeclutterEntry
@@ -42,7 +42,7 @@ import {transform2D} from '../../geom/flat/transform.js';
  */
 
 /**
- * @typedef {{0: CanvasRenderingContext2D, 1: import('../../size.js').Size, 2: import("../canvas.js").Label|HTMLImageElement|HTMLCanvasElement|HTMLVideoElement, 3: ImageOrLabelDimensions, 4: number, 5: Array<*>, 6: Array<*>}} ReplayImageOrLabelArgs
+ * @typedef {{0: CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D, 1: import('../../size.js').Size, 2: import("../canvas.js").Label|HTMLImageElement|HTMLCanvasElement|HTMLVideoElement, 3: ImageOrLabelDimensions, 4: number, 5: Array<*>, 6: Array<*>}} ReplayImageOrLabelArgs
  */
 
 /**
@@ -110,6 +110,20 @@ function createTextChunks(acc, line, i) {
   }
   acc.push(line, '');
   return acc;
+}
+
+/**
+ * Converts rich text to plain text for text along lines.
+ * @param {string} result The resulting plain text.
+ * @param {string} part Item of the rich text array.
+ * @param {number} index Index of the item in the rich text array.
+ * @return {string} The resulting plain text.
+ */
+function richTextToPlainText(result, part, index) {
+  if (index % 2 === 0) {
+    result += part;
+  }
+  return result;
 }
 
 class Executor {
@@ -377,6 +391,7 @@ class Executor {
     context.lineTo.apply(context, p1);
     if (fillInstruction) {
       this.alignAndScaleFill_ = /** @type {number} */ (fillInstruction[2]);
+      context.fillStyle = /** @type {string} */ (fillInstruction[1]);
       this.fill_(context);
     }
     if (strokeInstruction) {
@@ -568,7 +583,7 @@ class Executor {
 
   /**
    * @private
-   * @param {CanvasRenderingContext2D} context Context.
+   * @param {CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D} context Context.
    */
   fill_(context) {
     const alignAndScale = this.alignAndScaleFill_;
@@ -580,7 +595,6 @@ class Executor {
       if (alignAndScale !== 1) {
         context.scale(alignAndScale, alignAndScale);
       }
-      context.rotate(this.viewRotation_);
     }
     context.fill();
     if (alignAndScale) {
@@ -590,12 +604,15 @@ class Executor {
 
   /**
    * @private
-   * @param {CanvasRenderingContext2D} context Context.
+   * @param {CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D} context Context.
    * @param {Array<*>} instruction Instruction.
    */
   setStrokeStyle_(context, instruction) {
     context.strokeStyle =
       /** @type {import("../../colorlike.js").ColorLike} */ (instruction[1]);
+    if (!instruction[1]) {
+      return;
+    }
     context.lineWidth = /** @type {number} */ (instruction[2]);
     context.lineCap = /** @type {CanvasLineCap} */ (instruction[3]);
     context.lineJoin = /** @type {CanvasLineJoin} */ (instruction[4]);
@@ -643,7 +660,7 @@ class Executor {
 
   /**
    * @private
-   * @param {CanvasRenderingContext2D} context Context.
+   * @param {CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D} context Context.
    * @param {import('../../size.js').Size} scaledCanvasSize Scaled canvas size
    * @param {import("../../transform.js").Transform} transform Transform.
    * @param {Array<*>} instructions Instructions array.
@@ -703,8 +720,6 @@ class Executor {
       fillKey;
     let pendingFill = 0;
     let pendingStroke = 0;
-    let lastFillInstruction = null;
-    let lastStrokeInstruction = null;
     const coordinateCache = this.coordinateCache_;
     const viewRotation = this.viewRotation_;
     const viewRotationFromTransform =
@@ -867,15 +882,19 @@ class Executor {
             geometryWidths = /** @type {number} */ (instruction[25]);
           }
 
-          let padding, backgroundFill, backgroundStroke;
+          let padding, backgroundFillInstruction, backgroundStrokeInstruction;
           if (instruction.length > 17) {
             padding = /** @type {Array<number>} */ (instruction[16]);
-            backgroundFill = /** @type {boolean} */ (instruction[17]);
-            backgroundStroke = /** @type {boolean} */ (instruction[18]);
+            backgroundFillInstruction = /** @type {Array<*>} */ (
+              instruction[17]
+            );
+            backgroundStrokeInstruction = /** @type {Array<*>} */ (
+              instruction[18]
+            );
           } else {
             padding = defaultPadding;
-            backgroundFill = false;
-            backgroundStroke = false;
+            backgroundFillInstruction = null;
+            backgroundStrokeInstruction = null;
           }
 
           if (rotateWithView && viewRotationFromTransform) {
@@ -908,7 +927,7 @@ class Executor {
               scale,
               snapToPixel,
               padding,
-              backgroundFill || backgroundStroke,
+              !!backgroundFillInstruction || !!backgroundStrokeInstruction,
               feature,
             );
             /** @type {ReplayImageOrLabelArgs} */
@@ -918,12 +937,8 @@ class Executor {
               image,
               dimensions,
               opacity,
-              backgroundFill
-                ? /** @type {Array<*>} */ (lastFillInstruction)
-                : null,
-              backgroundStroke
-                ? /** @type {Array<*>} */ (lastStrokeInstruction)
-                : null,
+              backgroundFillInstruction,
+              backgroundStrokeInstruction,
             ];
             if (declutterTree) {
               let imageArgs, imageDeclutterMode, imageDeclutterBox;
@@ -993,7 +1008,11 @@ class Executor {
           const offsetY = /** @type {number} */ (instruction[8]);
           strokeKey = /** @type {string} */ (instruction[9]);
           const strokeWidth = /** @type {number} */ (instruction[10]);
-          text = /** @type {string} */ (instruction[11]);
+          text = /** @type {string|Array<string>} */ (instruction[11]);
+          if (Array.isArray(text)) {
+            //FIXME Add support for rich text along lines
+            text = text.reduce(richTextToPlainText, '');
+          }
           textKey = /** @type {string} */ (instruction[12]);
           const pixelRatioScale = [
             /** @type {number} */ (instruction[13]),
@@ -1192,7 +1211,6 @@ class Executor {
           ++i;
           break;
         case CanvasInstruction.SET_FILL_STYLE:
-          lastFillInstruction = instruction;
           this.alignAndScaleFill_ = instruction[2];
 
           if (pendingFill) {
@@ -1209,7 +1227,6 @@ class Executor {
           ++i;
           break;
         case CanvasInstruction.SET_STROKE_STYLE:
-          lastStrokeInstruction = instruction;
           if (pendingStroke) {
             context.stroke();
             pendingStroke = 0;
@@ -1240,7 +1257,7 @@ class Executor {
   }
 
   /**
-   * @param {CanvasRenderingContext2D} context Context.
+   * @param {CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D} context Context.
    * @param {import('../../size.js').Size} scaledCanvasSize Scaled canvas size.
    * @param {import("../../transform.js").Transform} transform Transform.
    * @param {number} viewRotation View rotation.
@@ -1269,7 +1286,7 @@ class Executor {
   }
 
   /**
-   * @param {CanvasRenderingContext2D} context Context.
+   * @param {CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D} context Context.
    * @param {import("../../transform.js").Transform} transform Transform.
    * @param {number} viewRotation View rotation.
    * @param {FeatureCallback<T>} [featureCallback] Feature callback.

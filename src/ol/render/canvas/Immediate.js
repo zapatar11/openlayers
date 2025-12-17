@@ -5,12 +5,17 @@
 // FIXME need to handle large thick features (where pixel size matters)
 // FIXME add offset and end to ol/geom/flat/transform~transform2D?
 
-import VectorContext from '../VectorContext.js';
+import {equals} from '../../array.js';
 import {asColorLike} from '../../colorlike.js';
+import {intersects} from '../../extent.js';
+import {transformGeom2D} from '../../geom/SimpleGeometry.js';
+import {transform2D} from '../../geom/flat/transform.js';
+import {toFixed} from '../../math.js';
 import {
   compose as composeTransform,
   create as createTransform,
 } from '../../transform.js';
+import VectorContext from '../VectorContext.js';
 import {
   defaultFillStyle,
   defaultFont,
@@ -24,11 +29,6 @@ import {
   defaultTextAlign,
   defaultTextBaseline,
 } from '../canvas.js';
-import {equals} from '../../array.js';
-import {intersects} from '../../extent.js';
-import {toFixed} from '../../math.js';
-import {transform2D} from '../../geom/flat/transform.js';
-import {transformGeom2D} from '../../geom/SimpleGeometry.js';
 
 /**
  * @classdesc
@@ -41,7 +41,7 @@ import {transformGeom2D} from '../../geom/SimpleGeometry.js';
  */
 class CanvasImmediateRenderer extends VectorContext {
   /**
-   * @param {CanvasRenderingContext2D} context Context.
+   * @param {CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D} context Context.
    * @param {number} pixelRatio Pixel ratio.
    * @param {import("../../extent.js").Extent} extent Extent.
    * @param {import("../../transform.js").Transform} transform Transform.
@@ -62,7 +62,7 @@ class CanvasImmediateRenderer extends VectorContext {
 
     /**
      * @private
-     * @type {CanvasRenderingContext2D}
+     * @type {CanvasRenderingContext2D|OffscreenCanvasRenderingContext2D}
      */
     this.context_ = context;
 

@@ -1,6 +1,12 @@
 /**
  * @module ol/render/canvas/PolygonBuilder
  */
+import {snap} from '../../geom/flat/simplify.js';
+import {
+  defaultFillStyle,
+  defaultLineDash,
+  defaultLineDashOffset,
+} from '../canvas.js';
 import CanvasBuilder from './Builder.js';
 import CanvasInstruction, {
   beginPathInstruction,
@@ -8,12 +14,6 @@ import CanvasInstruction, {
   fillInstruction,
   strokeInstruction,
 } from './Instruction.js';
-import {
-  defaultFillStyle,
-  defaultLineDash,
-  defaultLineDashOffset,
-} from '../canvas.js';
-import {snap} from '../../geom/flat/simplify.js';
 
 class CanvasPolygonBuilder extends CanvasBuilder {
   /**
@@ -255,13 +255,8 @@ class CanvasPolygonBuilder extends CanvasBuilder {
    */
   setFillStrokeStyles_() {
     const state = this.state;
-    const fillStyle = state.fillStyle;
-    if (fillStyle !== undefined) {
-      this.updateFillStyle(state, this.createFill);
-    }
-    if (state.strokeStyle !== undefined) {
-      this.updateStrokeStyle(state, this.applyStroke);
-    }
+    this.updateFillStyle(state, this.createFill);
+    this.updateStrokeStyle(state, this.applyStroke);
   }
 }
 

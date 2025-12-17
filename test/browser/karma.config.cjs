@@ -1,5 +1,3 @@
-/* eslint-disable import/no-commonjs */
-
 const path = require('path');
 const puppeteer = require('puppeteer');
 
@@ -12,6 +10,7 @@ if (process.env.CI) {
 
 module.exports = function (karma) {
   karma.set({
+    hostname: '127.0.0.1',
     browsers: ['ChromeHeadless'],
     customLaunchers: {
       ChromeHeadless: {
@@ -37,20 +36,6 @@ module.exports = function (karma) {
       },
       {
         pattern: path.resolve(__dirname, require.resolve('expect.js/index.js')),
-        watched: false,
-      },
-      {
-        pattern: path.resolve(
-          __dirname,
-          require.resolve('../../node_modules/sinon/pkg/sinon.js'),
-        ),
-        watched: false,
-      },
-      {
-        pattern: path.resolve(
-          __dirname,
-          require.resolve('proj4/dist/proj4.js'),
-        ),
         watched: false,
       },
       {
